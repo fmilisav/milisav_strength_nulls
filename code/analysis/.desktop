@@ -1,0 +1,6 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Link to 
+Type=Link
+URL=vscode-remote://ssh-remote%2Blabserver/poolz0/fmilisav/milisav_str_nulls_server/code/analysis/benchmark_analysis.py
+Icon=text-html

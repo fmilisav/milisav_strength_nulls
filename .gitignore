@@ -1,0 +1,7 @@
+figures/
+data/preprocessed_data/Lausanne125_preprocessed_data_dict.pickle
+data/preprocessed_data/Lausanne500_preprocessed_data_dict.pickle
+data/preprocessed_data/HCP_Schaefer400_preprocessed_data_dict.pickle
+data/preprocessed_data/HCP_Schaefer800_preprocessed_data_dict.pickle
+data/preprocessed_data/dir_conn_prepro_data_dict.pickle
+

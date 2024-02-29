@@ -1,0 +1,6 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Link to 
+Type=Link
+URL=vscode-remote://ssh-remote%2Blabserver/poolz0/fmilisav/milisav_str_nulls_server/data/preprocessed_data/dir_conn_prepro_data_dict.pickle
+Icon=text-html
