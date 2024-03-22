@@ -8,7 +8,7 @@ The [`analysis`](https://github.com/fmilisav/milisav_strength_nulls/blob/main/co
 
 - [`strength_preserving_rand_rs.py`](https://github.com/fmilisav/milisav_strength_nulls/blob/main/code/analysis/strength_preserving_rand_rs.py) contains an implementation of the Rubinov-Sporns (2011) strength-preserving randomization algorithm. It was adapted from a function intended for signed networks written in MATLAB by Mika Rubinov for the [Brain Connectivity Toolbox](https://sites.google.com/site/bctnet).
 
-- [`strength_preserving_rand_sa.py`](https://github.com/fmilisav/milisav_strength_nulls/blob/main/code/analysis/strength_preserving_rand_sa.py) contains the main function for generating strength-preserving randomized networks using simulated annealing as presented in the manuscript.
+- [`strength_preserving_rand_sa.py`](https://github.com/fmilisav/milisav_strength_nulls/blob/main/code/analysis/strength_preserving_rand_sa.py) contains the main function for generating strength-preserving randomized networks using simulated annealing as presented in the manuscript. It should only take a couple seconds to run on the provided structural consensus networks. For a detailed assessment of the time-performance tradeoff of the simulated annealing procedure, please refer to Fig. S12 of the manuscript.
 
 - [`strength_preserving_rand_sa_dir.py`](https://github.com/fmilisav/milisav_strength_nulls/blob/main/code/analysis/strength_preserving_rand_sa_dir.py) contains the simulated annealing algorithm for strength-preserving randomization adapted to directed networks.
 
@@ -39,11 +39,11 @@ Scripts respect the naming convention established in [`analysis`](https://github
 
 ```bash
 cd milisav_strength_nulls
-conda env create -f milisav_str_nulls.yml
-conda activate milisav_str_nulls
+conda env create -f code/plotting/milisav_str_nulls_plotting.yml
+conda activate milisav_str_nulls_plotting
 ```
 
-but append `_analysis` or `_plotting` to `milisav_str_nulls` as appropriate.
+or replacing `code/plotting/milisav_str_nulls_plotting.yml` by `code/analysis/milisav_str_nulls_analysis.yml` and `milisav_str_nulls_plotting` by `milisav_str_nulls_analysis` as appropriate. This should take a couple minutes.
 
 4. To reproduce the manuscript figures, simply type:
 
