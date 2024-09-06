@@ -4,12 +4,12 @@ import numpy as np
 from tqdm import tqdm
 from sklearn.utils import check_random_state
 
-def strength_preserving_rand_sa_dir(A, rewiring_iter = 10,
-                                    nstage = 100, niter = 10000,
-                                    temp = 1000, frac = 0.5,
-                                    energy_type = 'sse', energy_func = None,
-                                    connected = None, verbose = False,
-                                    seed = None):
+def in_strength_preserving_rand_sa_dir(A, rewiring_iter = 10,
+                                       nstage = 100, niter = 10000,
+                                       temp = 1000, frac = 0.5,
+                                       energy_type = 'sse', energy_func = None,
+                                       R = None, connected = None,
+                                       verbose = False, seed = None):
     """
     Degree- and strength-preserving randomization of
     directed, weighted adjacency matrix A
@@ -44,6 +44,11 @@ def strength_preserving_rand_sa_dir(A, rewiring_iter = 10,
         two strength sequence numpy arrays that returns an energy value.
         Overwrites “energy_type”.
         See “energy_type” for specifying a predefined energy type instead.
+    R : (N, N) array-like, optional
+        Pre-randomized adjacency matrix.
+        If None, a rewired adjacency matrix is generated using the
+        Maslov & Sneppen algorithm.
+        Default = None.
     connected: bool, optional
         Whether to ensure connectedness of the randomized network.
         By default, this is inferred from data.
@@ -64,9 +69,9 @@ def strength_preserving_rand_sa_dir(A, rewiring_iter = 10,
     -------
     Uses Maslov & Sneppen rewiring model to produce a
     surrogate adjacency matrix, B, with the same
-    size, density, and degree sequence as A.
-    The weights are then permuted to optimize the
-    match between the strength sequences of A and B
+    size, density, degree sequence, and out-strength sequence as A.
+    The outgoing connection weights are then permuted node-wise
+    to optimize the match between the in-strength sequences of A and B
     using simulated annealing.
     Both in- and out-strengths are preserved.
 
@@ -94,47 +99,43 @@ def strength_preserving_rand_sa_dir(A, rewiring_iter = 10,
 
     n = A.shape[0]
     s_in = np.sum(A, axis = 0) #in-strengths of A
-    s_out = np.sum(A, axis = 1) #out-strengths of A
 
+    #Maslov & Sneppen rewiring
+    if R is None:
     #ensuring connectedness if the original network is weakly connected
     #i.e., every node can reach every other node without accounting for
     #directionality
-    if connected is None:
-        G = nx.from_numpy_array(A, create_using = nx.DiGraph)
-        connected = nx.is_weakly_connected(G)
-
-    #Maslov & Sneppen rewiring
-    if connected:
-        B = bct.randmio_dir_connected(A, rewiring_iter, seed = seed)[0]
+        if connected is None:
+            G = nx.from_numpy_array(A, create_using = nx.DiGraph)
+            connected = nx.is_weakly_connected(G)
+        if connected:
+            B = bct.randmio_dir_connected(A, rewiring_iter, seed = seed)[0]
+        else:
+            B = bct.randmio_dir(A, rewiring_iter, seed = seed)[0]
     else:
-        B = bct.randmio_dir(A, rewiring_iter, seed = seed)[0]
+        B = R.copy()
 
-    u, v = B.nonzero() #nonzero indices of B
-    wts = B[(u, v)] #nonzero values of B
-    m = len(wts)
     sb_in = np.sum(B, axis = 0) #in-strengths of B
-    sb_out = np.sum(B, axis = 1) #out-strengths of B
 
     if energy_func is not None:
-        energy = energy_func(s_in, sb_in) + energy_func(s_out, sb_out)
+        energy = energy_func(s_in, sb_in)
     elif energy_type == 'sse':
-        energy = np.sum((s_in - sb_in)**2) + np.sum((s_out - sb_out)**2)
+        energy = np.sum((s_in - sb_in)**2)
     elif energy_type == 'max':
-        energy = np.max(np.abs(s_in - sb_in)) + np.max(np.abs(s_out - sb_out))
+        energy = np.max(np.abs(s_in - sb_in))
     elif energy_type == 'mae':
-        energy= np.mean(np.abs(s_in - sb_in)) + np.mean(np.abs(s_out - sb_out))
+        energy= np.mean(np.abs(s_in - sb_in))
     elif energy_type == 'mse':
-        energy = np.mean((s_in - sb_in)**2) + np.mean((s_out - sb_out)**2)
+        energy = np.mean((s_in - sb_in)**2)
     elif energy_type == 'rmse':
-        energy = (np.sqrt(np.mean((s_in - sb_in)**2)) +
-                 np.sqrt(np.mean((s_out - sb_out)**2)))
+        energy = np.sqrt(np.mean((s_in - sb_in)**2))
     else:
         msg = ("energy_type must be one of 'sse', 'max', "
                "'mae', 'mse', or 'rmse'. Received: {}.".format(energy_type))
         raise ValueError(msg)
 
     energymin = energy
-    wtsmin = wts.copy()
+    B_min = B.copy()
 
     if verbose:
         print('\ninitial energy {:.5f}'.format(energy))
@@ -144,38 +145,34 @@ def strength_preserving_rand_sa_dir(A, rewiring_iter = 10,
         naccept = 0
         for i in range(niter):
 
-            #permutation
-            e1 = rs.randint(m)
-            e2 = rs.randint(m)
+            #random node
+            node = rs.randint(n)
 
-            a, b = u[e1], v[e1]
-            c, d = u[e2], v[e2]
+            #endpoints
+            u = B[node, :].nonzero()[0]
+            wts = B[node, u]
+            m = len(wts)
+
+            #permutation
+            e1, e2 = rs.randint(m, size = (2,))
+            a, b = u[e1], u[e2]
 
             sb_prime_in = sb_in.copy()
-            sb_prime_out = sb_out.copy()
-            sb_prime_in[b] = sb_prime_in[b] - wts[e1] + wts[e2]
-            sb_prime_out[a] = sb_prime_out[a] - wts[e1] + wts[e2]
-            sb_prime_in[d] = sb_prime_in[d] - wts[e2] + wts[e1]
-            sb_prime_out[c] = sb_prime_out[c] - wts[e2] + wts[e1]
+            sb_prime_in[a] = sb_prime_in[a] - wts[e1] + wts[e2]
+            sb_prime_in[b] = sb_prime_in[b] - wts[e2] + wts[e1]
 
             if energy_func is not None:
-                energy_prime = (energy_func(sb_prime_in, s_in) +
-                                energy_func(sb_prime_out, s_out))
+                energy_prime = energy_func(sb_prime_in, s_in)
             elif energy_type == 'sse':
-                energy_prime = (np.sum((sb_prime_in - s_in)**2) +
-                                np.sum((sb_prime_out - s_out)**2))
+                energy_prime = np.sum((sb_prime_in - s_in)**2)
             elif energy_type == 'max':
-                energy_prime = (np.max(np.abs(sb_prime_in - s_in)) +
-                                np.max(np.abs(sb_prime_out - s_out)))
+                energy_prime = np.max(np.abs(sb_prime_in - s_in))
             elif energy_type == 'mae':
-                energy_prime = (np.mean(np.abs(sb_prime_in - s_in)) +
-                                np.mean(np.abs(sb_prime_out - s_out)))
+                energy_prime = np.mean(np.abs(sb_prime_in - s_in))
             elif energy_type == 'mse':
-                energy_prime = (np.mean((sb_prime_in - s_in)**2) +
-                                np.mean((sb_prime_out - s_out)**2))
+                energy_prime = np.mean((sb_prime_in - s_in)**2)
             elif energy_type == 'rmse':
-                energy_prime = (np.sqrt(np.mean((sb_prime_in - s_in)**2)) +
-                                np.sqrt(np.mean((sb_prime_out - s_out)**2)))
+                energy_prime = np.sqrt(np.mean((sb_prime_in - s_in)**2))
             else:
                 msg = ("energy_type must be one of 'sse', 'max', "
                        "'mae', 'mse', or 'rmse'. "
@@ -184,14 +181,13 @@ def strength_preserving_rand_sa_dir(A, rewiring_iter = 10,
 
             #permutation acceptance criterion
             if (energy_prime < energy or
-               rs.rand() < np.exp(-(energy_prime - energy)/temp)):
+                rs.rand() < np.exp(-(energy_prime - energy)/temp)):
                 sb_in = sb_prime_in.copy()
-                sb_out = sb_prime_out.copy()
-                wts[[e1, e2]] = wts[[e2, e1]]
+                B[node, [a, b]] = B[node, [b, a]]
                 energy = energy_prime
                 if energy < energymin:
                     energymin = energy
-                    wtsmin = wts.copy()
+                    B_min = B.copy()
                 naccept = naccept + 1
 
         #temperature update
@@ -202,7 +198,4 @@ def strength_preserving_rand_sa_dir(A, rewiring_iter = 10,
                                                          energymin,
                                                          naccept/niter))
 
-    B = np.zeros((n, n))
-    B[(u, v)] = wtsmin
-
-    return B, energymin
+    return B_min, energymin

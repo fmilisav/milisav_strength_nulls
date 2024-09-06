@@ -1,20 +1,20 @@
 import bct
 import math
 import numpy as np
+import networkx as nx
 from sklearn.utils import check_random_state
 
-def strength_preserving_rand_rs(A,
-                                rewiring_iter = 10, sort_freq = 1,
-                                R = None, connected = None, 
-                                seed = None):
+def strength_preserving_rand_rs_dir(A, rewiring_iter = 10, sort_freq = 1,
+                                    R = None, connected = None,
+                                    seed = None):
     """
     Degree- and strength-preserving randomization of
-    undirected, weighted adjacency matrix A
+    directed, weighted adjacency matrix A
 
     Parameters
     ----------
     A : (N, N) array-like
-        Undirected weighted adjacency matrix
+        Directed weighted adjacency matrix
     rewiring_iter : int, optional
         Rewiring parameter. Default = 10.
 	    Each edge is rewired approximately rewiring_iter times.
@@ -34,7 +34,7 @@ def strength_preserving_rand_rs(A,
         By default, this is inferred from data.
     seed: float, optional
         Random seed. Default = None.
-    
+
     Returns
     -------
     B : (N, N) array-like
@@ -43,32 +43,33 @@ def strength_preserving_rand_rs(A,
     Notes
     -------
     Uses Maslov & Sneppen rewiring to produce a
-    surrogate adjacency matrix, B, with the same 
-    size, density, and degree sequence as A. 
+    surrogate adjacency matrix, B, with the same
+    size, density, and degree sequence as A.
     The weights are then permuted to optimize the
     match between the strength sequences of A and B.
+    Both in- and out-strengths are preserved.
 
-    This function is adapted from a function written in MATLAB 
+    This function is adapted from a function written in MATLAB
     by Mika Rubinov (https://sites.google.com/site/bctnet/home).
-    It was adapted to positive structural connectivity networks 
-    from an algorithm originally developed for 
+    It was adapted to positive, directed structural connectivity networks
+    from an algorithm originally developed for
     signed functional connectivity networks.
 
     References
     -------
-    Maslov & Sneppen (2002) Specificity and stability in 
+    Maslov & Sneppen (2002) Specificity and stability in
     topology of protein networks. Science.
     Rubinov & Sporns (2011) Weight-conserving characterization of
     complex functional brain networks. Neuroimage.
     """
 
-    A = A.copy()
+    A = A.astype('float64')
     try:
         A = np.asarray(A)
     except TypeError as err:
         msg = ('A must be array_like. Received: {}.'.format(type(A)))
         raise TypeError(msg) from err
-    
+
     if sort_freq > 1 or sort_freq <= 0:
         msg = ('sort_freq must be between 0 and 1. '
                'Received: {}.'.format(sort_freq))
@@ -82,22 +83,26 @@ def strength_preserving_rand_rs(A,
     np.fill_diagonal(A, 0)
 
     if R is None:
-        #ensuring connectedness if the original network is connected
+        #ensuring connectedness if the original network is weakly connected
+        #i.e., every node can reach every other node without accounting for
+        #directionality
         if connected is None:
-            connected = False if bct.number_of_components(A) > 1 else True
+            G = nx.from_numpy_array(A, create_using = nx.DiGraph)
+            connected = nx.is_weakly_connected(G)
 
         #Maslov & Sneppen rewiring
         if connected:
-            R = bct.randmio_und_connected(A, rewiring_iter, seed = seed)[0]
+            R = bct.randmio_dir_connected(A, rewiring_iter, seed = seed)[0]
         else:
-            R = bct.randmio_und(A, rewiring_iter, seed = seed)[0]
+            R = bct.randmio_dir(A, rewiring_iter, seed = seed)[0]
 
     B = np.zeros((n, n))
-    s = np.sum(A, axis = 1) #strengths of A
-    sortAvec = np.sort(A[np.triu(A, k=1) > 0]) #sorted weights vector
-    x, y = np.nonzero(np.triu(R, k=1)) #weights indices
+    s_in = np.sum(A, axis = 0) #in-strengths of A
+    s_out = np.sum(A, axis = 1) #out-strengths of A
+    sortAvec = np.sort(A[A > 0]) #sorted weights vector
+    x, y = np.nonzero(R) #weights indices
 
-    E = np.outer(s, s) #expected weights matrix
+    E = np.outer(s_out, s_in) #expected weights matrix
 
     if sort_freq == 1:
         for i in range(len(sortAvec) -1, -1, -1):
@@ -111,19 +116,19 @@ def strength_preserving_rand_rs(A,
 
             #radjusting the expected weight probabilities of
             #the node indexed in x
-            f = 1 - sortAvec[r]/s[x[r_idx]]
+            f = 1 - sortAvec[r]/s_out[x[r_idx]]
             E[x[r_idx], :] *= f
-            E[:, x[r_idx]] *= f
 
             #radjusting the expected weight probabilities of
             #the node indexed in y
-            f = 1 - sortAvec[r]/s[y[r_idx]]
-            E[y[r_idx], :] *= f
+            f = 1 - sortAvec[r]/s_in[y[r_idx]]
             E[:, y[r_idx]] *= f
 
             #readjusting residual strengths of nodes indexed in x and y
-            s[x[r_idx]] -= sortAvec[r]
-            s[y[r_idx]] -= sortAvec[r]
+            s_in[y[r_idx]] -= sortAvec[r]
+            s_out[x[r_idx]] -= sortAvec[r]
+
+            #E = np.outer(s_out, s_in)
 
             #removing current weight
             x = np.delete(x, r_idx)
@@ -135,34 +140,36 @@ def strength_preserving_rand_rs(A,
             sort_idx = np.argsort(E[x, y]) #indices of x and y that sort E
 
             r = rs.choice(i, min(i, sort_period), replace = False)
-            r_idx = sort_idx[r]#random indices of sorted expected weight matrix
+            r_idx = sort_idx[r] #random indices of sorted expected weight matrix
 
             #assigning corresponding sorted weights at these indices
             B[x[r_idx], y[r_idx]] = sortAvec[r]
 
-            xy_nodes = np.append(x[r_idx], y[r_idx]) #randomly indexed nodes
-            xy_nodes_idx = np.unique(xy_nodes) #randomly indexed nodes' indices
+            #randomly indexed nodes' indices
+            x_nodes_idx = np.unique(x[r_idx])
+            y_nodes_idx = np.unique(y[r_idx])
 
             #nodal cumulative weights
-            accumWvec = np.bincount(xy_nodes, 
-                                    weights = sortAvec[np.append(r, r)],
-                                    minlength = n)
+            x_accumWvec = np.bincount(x[r_idx], weights = sortAvec[r],
+                                      minlength = n)
+            y_accumWvec = np.bincount(y[r_idx], weights = sortAvec[r],
+                                      minlength = n)
 
             #readjusting expected weight probabilities
-            F = 1 - accumWvec[xy_nodes_idx]/s[xy_nodes_idx]
+            F = 1 - x_accumWvec[x_nodes_idx]/s_in[x_nodes_idx]
             F = F[:, np.newaxis]
+            E[x_nodes_idx, :] *= F
 
-            E[xy_nodes_idx, :] *= F
-            E[:, xy_nodes_idx] *= F.T
+            F = 1 - y_accumWvec[y_nodes_idx]/s_out[y_nodes_idx]
+            E[:, y_nodes_idx] *= F
 
             #readjusting residual strengths of nodes indexed in x and y
-            s[xy_nodes_idx] -= accumWvec[xy_nodes_idx]
+            s_in[x_nodes_idx] -= x_accumWvec[x_nodes_idx]
+            s_out[y_nodes_idx] -= y_accumWvec[y_nodes_idx]
 
             #removing current weight
             x = np.delete(x, r_idx)
             y = np.delete(y, r_idx)
             sortAvec = np.delete(sortAvec, r)
-
-    B += B.T
 
     return B

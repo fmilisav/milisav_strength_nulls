@@ -3,17 +3,17 @@ import numpy as np
 from tqdm import tqdm
 from sklearn.utils import check_random_state
 
-def strength_preserving_rand_sa_flexE(A, rewiring_iter = 10, 
+def strength_preserving_rand_sa_flexE(A, rewiring_iter = 10,
                                       nstage = 100, niter = 10000,
                                       temp = 1000, frac = 0.5,
                                       energy_type = 'sse', energy_func = None,
-                                      connected = None, verbose = False, 
+                                      connected = None, verbose = False,
                                       seed = None):
     """
     Degree- and strength-preserving randomization of
     undirected, weighted adjacency matrix A
     with flexible energy function
-    
+
     Parameters
     ----------
     A : (N, N) array-like
@@ -48,7 +48,7 @@ def strength_preserving_rand_sa_flexE(A, rewiring_iter = 10,
         Whether to ensure connectedness of the randomized network.
         By default, this is inferred from data.
     verbose: bool, optional
-        Whether to print status to screen at the end of every stage. 
+        Whether to print status to screen at the end of every stage.
         Default = False.
     seed: float, optional
         Random seed. Default = None.
@@ -57,19 +57,19 @@ def strength_preserving_rand_sa_flexE(A, rewiring_iter = 10,
     -------
     B : (N, N) array-like
         Randomized adjacency matrix
-    min_energy : float
+    energymin : float
         Minimum energy obtained by annealing
 
     Notes
     -------
     Uses Maslov & Sneppen rewiring model to produce a
-    surrogate adjacency matrix, B, with the same 
-    size, density, and degree sequence as A. 
+    surrogate adjacency matrix, B, with the same
+    size, density, and degree sequence as A.
     The weights are then permuted to optimize the
-    match between the strength sequences of A and B 
+    match between the strength sequences of A and B
     using simulated annealing.
-    
-    This function is adapted from a function written in MATLAB 
+
+    This function is adapted from a function written in MATLAB
     by Richard Betzel.
 
     References
@@ -83,7 +83,7 @@ def strength_preserving_rand_sa_flexE(A, rewiring_iter = 10,
     except TypeError as err:
         msg = ('A must be array_like. Received: {}.'.format(type(A)))
         raise TypeError(msg) from err
-    
+
     if frac > 1 or frac <= 0:
         msg = ('frac must be between 0 and 1. '
                'Received: {}.'.format(frac))
@@ -167,7 +167,7 @@ def strength_preserving_rand_sa_flexE(A, rewiring_iter = 10,
 
             #permutation acceptance criterion
             if (energy_prime < energy or
-               rs.rand() < np.exp(-(energy_prime - energy)/temp)):
+                rs.rand() < np.exp(-(energy_prime - energy)/temp)):
                 sb = sb_prime.copy()
                 wts[[e1, e2]] = wts[[e2, e1]]
                 energy = energy_prime
