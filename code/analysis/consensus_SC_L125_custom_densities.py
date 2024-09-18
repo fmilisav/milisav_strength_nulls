@@ -40,7 +40,7 @@ intra_n = 2132 #average number of intra-hemispheric connections
 intra_n_arr = [2132]
 
 #upscale/downscale inter/intra-hemispheric connections
-while inter_n + intra_n < 20000: 
+while inter_n + intra_n < 20000:
     inter_n = inter_n*1.10
     intra_n = intra_n*1.10
     inter_n_arr.append(inter_n)
@@ -72,7 +72,7 @@ for i in range(len(inter_n_arr)):
     #weight consensus SC by mean across subjects
     consensusSC_wei = consensusSC_bin * mean
 
-    with open('../../data/preprocessed_data/scaling_analysis/'
-              'consensusSC_125_wei_{}_conns.npy'.format(eff_nedges), 
+    with open(os.path.join(scaling_path,
+              'consensusSC_125_wei_{}_conns.npy'.format(eff_nedges)),
               'wb') as f:
         np.save(f, consensusSC_wei)

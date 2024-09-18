@@ -7,6 +7,10 @@ import numpy as np
 from netneurotools.modularity import zrand
 from scipy.stats import kstest, linregress
 
+#requires MATLAB
+#import matlab.engine
+#eng = matlab.engine.start_matlab()
+
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -16,7 +20,8 @@ import pandas as pd
 
 from utils import align_yaxis, cpl_func, hub_stats, mannwhitneyu_print, \
 				  make_dir, niter_null_strengths, null_color, pickle_load, \
-				  plot_morphospace, plot_strengths_regplots, save_plot, scale
+				  plot_morphospace, plot_strengths_regplots, save_plot, scale,\
+				  scale_lightness
 
 import pickle5 as pickle
 
@@ -73,21 +78,57 @@ L125_niter_prepro_data = pickle_load('../../data/preprocessed_data/'
 									'Lausanne125_niter_preprocessed_data_dict')
 
 drosophila = np.load('../../data/original_data/drosophila.npy')
-mouse = np.load('../../data/original_data/mouse.npy', 
+mouse = np.load('../../data/original_data/mouse.npy',
 				allow_pickle = True)
 rat = np.load('../../data/original_data/rat.npy')
-macaque = np.load('../../data/original_data/macaque.npy', 
+macaque = np.load('../../data/original_data/macaque.npy',
 				  allow_pickle = True)
 
-dir_conns = {'drosophila': drosophila, 'mouse': mouse, 
+dir_conns = {'drosophila': drosophila, 'mouse': mouse,
 			 'rat': rat, 'macaque': macaque}
 
 dir_conn_prepro_data = pickle_load('../../data/preprocessed_data/'
 								   'dir_conn_prepro_data_dict')
+drosophila_prepro_data = pickle_load('../../data/preprocessed_data/'
+									 'drosophila_prepro_data_dict')
+mouse_prepro_data = pickle_load('../../data/preprocessed_data/'
+								'mouse_prepro_data_dict')
+rat_prepro_data = pickle_load('../../data/preprocessed_data/'
+							  'rat_prepro_data_dict')
+macaque_prepro_data = pickle_load('../../data/preprocessed_data/'
+								  'macaque_prepro_data_dict')
+
+dir_conn_prepro_data = {'drosophila': drosophila_prepro_data,
+						'mouse': mouse_prepro_data,
+						'rat': rat_prepro_data,
+						'macaque': macaque_prepro_data}
+
+for animal in dir_conn_prepro_data.keys():
+	in_str_sa_prepro_data = pickle_load('../../data/preprocessed_data/'
+							'in_strengths_sa_{}_prepro_data_dict'.format(animal))
+	dir_conn_prepro_data[animal]['strengths']['in_str_sa'] = in_str_sa_prepro_data['strengths']
+
+key_to_file = {'ephys': 'electrophysiological_connectivity.npy',
+			   'gene': 'gene_coexpression.npy',
+			   'haemo': 'haemodynamic_connectivity.npy',
+			   'laminar': 'laminar_similarity.npy',
+			   'metabolic': 'metabolic_connectivity.npy',
+			   'receptor': 'receptor_similarity.npy',
+			   'temporal': 'temporal_similarity.npy'}
+
+signed_conns = {}
+for filename in os.listdir('../../data/original_data/many_networks/'):
+    signed_conns[filename.split('.')[0]] = np.load('../../data/original_data/'
+                                                   'many_networks/' + filename)
+
+signed_conn_prepro_data = {}
+for key in signed_conns.keys():
+	signed_conn_prepro_data[key] = pickle_load('../../data/preprocessed_data/'
+								   '{}_prepro_data_dict'.format(key))
 
 #plotting style parameters
 sns.set_style("ticks")
-sns.set(context=None, style=None, palette=None, 
+sns.set(context=None, style=None, palette=None,
 		font_scale=5, color_codes=None)
 plt.rcParams['svg.fonttype'] = 'none'
 plt.rcParams.update({'font.size': 30})
@@ -115,9 +156,9 @@ for conn_key, SCmat in conns.items():
 		og_strengths = og_strengths_dict[conn_key]
 		rewired_strengths = strengths[conn_key][null]
 
-		corrs, _, _ = plot_strengths_regplots(og_strengths, rewired_strengths, 
+		corrs, _, _ = plot_strengths_regplots(og_strengths, rewired_strengths,
 											  NNULLS, color, regplot_abs_path)
-		
+
 		conn_corrs[null] = np.array(corrs)
 
 	x = conn_corrs['sa']
@@ -177,9 +218,15 @@ for conn_key, SCmat in conns.items():
 
 		KS_dict[null] = np.array(KS_arr)
 
-		sns.kdeplot(x = KS_arr, common_norm = True, cut = 0, 
-			  		ax = ax, color = color, fill = True)
-		
+	full_KS_arr = np.array(KS_dict['ms'].tolist() +
+						   KS_dict['str'].tolist() +
+						   KS_dict['sa'].tolist())
+	hue = ['Maslov-Sneppen']*NNULLS + ['Rubinov-Sporns']*NNULLS + \
+		  ['simulated annealing']*NNULLS
+	palette = ['dimgrey', '#00A1A1', '#2A7DBC']
+	sns.histplot(x = full_KS_arr, hue = hue, palette = palette,
+			     bins = 'sqrt', ax = ax)
+
 	ax.set_xlabel('Kolmogorov-Smirnov statistic')
 	ax.set_box_aspect(1)
 	save_plot(ax, ksplot_abs_path)
@@ -378,15 +425,14 @@ x.extend(hubs_frac_dict['str'])
 x.extend(hubs_frac_dict['sa'])
 x = np.array(x)
 x = x*100
-y = (['Maslov-Sneppen']*NNULLS + ['Rubinov-Sporns']*NNULLS + 
+y = (['Maslov-Sneppen']*NNULLS + ['Rubinov-Sporns']*NNULLS +
 	 ['simulated annealing']*NNULLS)
-ax = sns.kdeplot(x = x, hue = y, 
-				 palette = ['dimgrey', '#00A1A1', '#2A7DBC'], 
-				 fill = True)
+ax = sns.histplot(x = x, hue = y, bins = 'sqrt',
+				  palette = ['dimgrey', '#00A1A1', '#2A7DBC'])
 ax.axvline(og_hubs_frac*100, c='orange')
 ax.set_xlabel('hubs (%)')
 ax.set_box_aspect(1)
-sns.move_legend(ax, "lower center", bbox_to_anchor=(.5, 1), 
+sns.move_legend(ax, "lower center", bbox_to_anchor=(.5, 1),
 				ncol=3, title=None, frameon=False)
 save_plot(ax, hub_frac_abs_path)
 
@@ -397,12 +443,11 @@ x.extend(rand_idx_dict['str'])
 x.extend(rand_idx_dict['sa'])
 x = np.array(x)
 x = x*100
-ax = sns.kdeplot(x = x, hue = y, 
-				 palette = ['dimgrey', '#00A1A1', '#2A7DBC'], 
-				 fill = True)
+ax = sns.histplot(x = x, hue = y, bins = 'sqrt',
+				  palette = ['dimgrey', '#00A1A1', '#2A7DBC'])
 ax.set_xlabel('z-Rand index')
 ax.set_box_aspect(1)
-sns.move_legend(ax, "lower center", bbox_to_anchor=(.5, 1), 
+sns.move_legend(ax, "lower center", bbox_to_anchor=(.5, 1),
 				ncol=3, title=None, frameon=False)
 save_plot(ax, rand_idx_abs_path)
 
@@ -410,8 +455,14 @@ save_plot(ax, rand_idx_abs_path)
 morphospaces_path = os.path.join(direc, 'morphospaces')
 make_dir(morphospaces_path)
 
+contour_palette = []
+for color in ["dimgrey", "#00A1A1", "#2A7DBC"]:
+    rgb = mcolors.ColorConverter.to_rgb(color)
+    contour_palette.append(scale_lightness(rgb, 0.75))
+
 print('morphospace statistics')
-plt.rcParams.update({'font.size': 20})
+plt.rcParams.update({'font.size': 15})
+
 for conn_key, SCmat in conns.items():
 	print(conn_key)
 
@@ -422,15 +473,14 @@ for conn_key, SCmat in conns.items():
 	null_morpho_abs_path = os.path.join(morphospaces_path, null_morpho_path)
 
 	low_res_morpho_path = 'low_res_morphospace_{}.svg'.format(conn_key)
-	low_res_morpho_abs_path = os.path.join(morphospaces_path, 
+	low_res_morpho_abs_path = os.path.join(morphospaces_path,
 										   low_res_morpho_path)
 
 	low_res_null_morpho_path='low_res_null_morphospace_{}.svg'.format(conn_key)
-	low_res_null_morpho_abs_path = os.path.join(morphospaces_path, 
+	low_res_null_morpho_abs_path = os.path.join(morphospaces_path,
 					     						low_res_null_morpho_path)
 
 	data = prepro_data[conn_key]
-
 	#calculating morphospace global network statistics
 	#for the empirical network
 	og_cpl = cpl_func(SCmat)
@@ -443,17 +493,21 @@ for conn_key, SCmat in conns.items():
 	data['mean_clustering'].insert(0, og_mean_clustering)
 	data['colours'].insert(0, 'empirical')
 
+	cpl = np.array(data['cpl'])
+	mean_clustering = np.array(data['mean_clustering'])
+	colours = np.array(data['colours'])
+
 	#full resolution - all nulls
-	plot_morphospace(data['cpl'], data['mean_clustering'], data['colours'],
+	plot_morphospace(cpl, mean_clustering, colours,
 				  	 ['#6725A1', "dimgrey", "#00A1A1", "#2A7DBC"],
 					 morpho_abs_path, linewidth = 0.25)
 
-	ax = sns.jointplot(x = data['cpl'][1:], y = data['mean_clustering'][1:],
-	                   hue = data['colours'][1:],
-	                   palette = ["dimgrey", "#00A1A1", "#2A7DBC"], 
-					   linewidth = 0.25)
-	ax.plot_joint(sns.kdeplot, hue = [0, 1, 2], 
-	       		  palette=['white', 'white', 'white'], 
+	ax = sns.jointplot(x = cpl[1:], y = mean_clustering[1:],
+	                   hue = colours[1:],
+	                   palette = ["dimgrey", "#00A1A1", "#2A7DBC"],
+					   rasterized = True, linewidth = 0.25)
+	ax.plot_joint(sns.kdeplot, hue = [0, 1, 2],
+	       		  palette = contour_palette,
 				  zorder=1, levels=4, linewidths = 2)
 	ax.ax_joint.legend_.remove()
 	ax.ax_joint.set(xlabel = 'Characteristic path length',
@@ -461,29 +515,25 @@ for conn_key, SCmat in conns.items():
 	ax.savefig(null_morpho_abs_path, dpi = 300)
 	plt.close(ax.fig)
 
-	cpl = np.array(data['cpl'])
-	mean_clustering = np.array(data['mean_clustering'])
-	colours = np.array(data['colours'])
-
 	ms_idx = np.where(colours == 'Maslov-Sneppen')[0]
 	str_idx = np.where(colours == 'Rubinov-Sporns')[0]
 	sa_idx = np.where(colours == 'simulated annealing')[0]
 
 	#low resolution - 100 nulls
-	low_res_cpl = np.append(cpl[0], 
-			 				[cpl[ms_idx][:100], 
-	 						 cpl[str_idx][:100], 
+	low_res_cpl = np.append(cpl[0],
+			 				[cpl[ms_idx][:100],
+	 						 cpl[str_idx][:100],
 							 cpl[sa_idx][:100]])
-	low_res_mean_clustering = np.append(mean_clustering[0], 
-				     					[mean_clustering[ms_idx][:100], 
-	       								 mean_clustering[str_idx][:100], 
+	low_res_mean_clustering = np.append(mean_clustering[0],
+				     					[mean_clustering[ms_idx][:100],
+	       								 mean_clustering[str_idx][:100],
 										 mean_clustering[sa_idx][:100]])
-	low_res_colours = np.append(colours[0], 
-			     				[colours[ms_idx][:100], 
-								 colours[str_idx][:100], 
+	low_res_colours = np.append(colours[0],
+			     				[colours[ms_idx][:100],
+								 colours[str_idx][:100],
 								 colours[sa_idx][:100]])
 	plot_morphospace(low_res_cpl, low_res_mean_clustering, low_res_colours,
-				  	 ["#6725A1", "dimgrey", "#00A1A1", "#2A7DBC"], 
+				  	 ["#6725A1", "dimgrey", "#00A1A1", "#2A7DBC"],
 					 low_res_morpho_abs_path)
 
 	plot_morphospace(low_res_cpl[1:], low_res_mean_clustering[1:],
@@ -493,9 +543,9 @@ for conn_key, SCmat in conns.items():
 	#subsamples
 	np.random.seed(0)
 
-	subsampling_df = {'feature': [], 'null': [], 'sample size': [], 
+	subsampling_df = {'feature': [], 'null': [], 'sample size': [],
 		   			  'mean_diff': [], 'var_diff': []}
-	sample_sizes = [100, 500, 1000, 5000]
+	sample_sizes = [100, 250, 500, 750, 1000, 2500, 5000, 7500]
 	for feature in ['cpl', 'clustering']:
 		data = cpl if feature == 'cpl' else mean_clustering
 		for null in ['ms', 'str', 'sa']:
@@ -505,7 +555,7 @@ for conn_key, SCmat in conns.items():
 				null_data = data[str_idx]
 			else:
 				null_data = data[sa_idx]
-				
+
 			#mean and variance over the whole null population
 			data_mean = np.mean(null_data)
 			data_var = np.var(null_data, ddof = 1)
@@ -527,27 +577,29 @@ for conn_key, SCmat in conns.items():
 					subsampling_df['sample size'].append(n)
 					subsampling_df['mean_diff'].append(norm_mean_diff)
 					subsampling_df['var_diff'].append(norm_var_diff)
-	
+
 	subsampling_df = pd.DataFrame(subsampling_df)
 	for feature in ['cpl', 'clustering']:
 		for stat in ['mean_diff', 'var_diff']:
 
 			subsampling_path = 'subsampling_{}_{}_{}.svg'.format(feature, stat,
 																 conn_key)
-			subsampling_abs_path = os.path.join(morphospaces_path, 
+			subsampling_abs_path = os.path.join(morphospaces_path,
 									   			subsampling_path)
 
 			data = subsampling_df[subsampling_df['feature'] == feature]
-			ax = sns.lineplot(data = data, 
-		     				  x = 'sample size', y = stat, hue = 'null',
+			ax = sns.lineplot(data = data,
+		     				  x = 'sample size', y = stat,
+							  hue = 'null', style = 'null',
 						      palette = ["dimgrey", "#00A1A1", "#2A7DBC"],
-						      seed = 0, legend = False)
+						      seed = 0, legend = False,
+							  markers = [".", ".", "."], dashes = ["", "", ""])
 			ax.set_xlabel('subsample size')
 			if stat == 'mean_diff':
 				ax.set_ylabel('relative mean difference (%)')
 			else:
 				ax.set_ylabel('relative variance difference (%)')
-			ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), 
+			ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25),
 			 		  frameon = False)
 			ax.set_box_aspect(1)
 			save_plot(ax, subsampling_abs_path)
@@ -557,7 +609,7 @@ for conn_key, SCmat in conns.items():
 	x = cpl[sa_idx]
 	y = cpl[str_idx]
 	mannwhitneyu_print(x, y, 'sa', 'str')
-    
+
 	x = cpl[ms_idx]
 	y = cpl[sa_idx]
 	mannwhitneyu_print(x, y, 'ms', 'sa')
@@ -628,19 +680,19 @@ strengths_arr = list(zip(*Parallel(n_jobs = 6)(delayed(niter_null_strengths)(L12
 strengths_sa_1000_iter, strengths_sa_100000_iter = strengths_arr
 
 plt.rcParams.update({'font.size': 30})
-for niter, rewired_strengths in [('1000', strengths_sa_1000_iter), 
+for niter, rewired_strengths in [('1000', strengths_sa_1000_iter),
 								 ('100000', strengths_sa_100000_iter)]:
 
 	regplot_path = '{}_niter_regplot.svg'.format(niter)
 	regplot_abs_path = os.path.join(cost_path, regplot_path)
 
 	og_strengths = np.sum(L125, axis = 1)
-	rewired_strengths = [strength for sublist in rewired_strengths 
+	rewired_strengths = [strength for sublist in rewired_strengths
 					  	 for strength in sublist]
 
 	corrs, r, sd = plot_strengths_regplots(og_strengths, rewired_strengths,
 										   100, "#2A7DBC", regplot_abs_path)
-    
+
 	print('niter: {}'.format(niter))
 	print('mean: {}'.format(r))
 	print('sd: {}'.format(sd))
@@ -649,22 +701,28 @@ for niter, rewired_strengths in [('1000', strengths_sa_1000_iter),
 plt.rcParams.update({'font.size': 20})
 plt.rcParams['legend.fontsize'] = 15
 
-scaling_path = 'scaling.svg'
-scaling_abs_path = os.path.join(cost_path, scaling_path)
+time_scaling_path = 'time_density_scaling.svg'
+time_scaling_abs_path = os.path.join(cost_path, time_scaling_path)
 
-fig, ax = plt.subplots()
+mse_scaling_path = 'mse_density_scaling.svg'
+mse_scaling_abs_path = os.path.join(cost_path, mse_scaling_path)
+
+fig1, ax1 = plt.subplots()
+fig2, ax2 = plt.subplots()
 for null in ['ms', 'str', 'sa']:
 
 	time_arr = []
+	mse_arr = []
 	density_arr = []
 	for filename in os.listdir('../../data/preprocessed_data/'
 							   'scaling_analysis'):
-		if "consensusSC_125_wei_" in filename:
-			density = filename.split('_')[-2]
+		if "preprocessed" in filename and "L" not in filename:
+			density = filename.split('_')[0]
 			conn_dict = pickle_load('../../data/preprocessed_data/'
 						   			'scaling_analysis/{}'
 									'_preprocessed_data_dict'.format(density))
 			time_arr.extend(conn_dict['time'][null])
+			mse_arr.extend(conn_dict['mse'][null])
 			#calculating density as a percentage
 			density_arr.extend([(int(density)/
 								(len(L125)*len(L125)-len(L125)))*100]*100)
@@ -674,16 +732,90 @@ for null in ['ms', 'str', 'sa']:
 	slope, intercept, r, p, _ = linregress(density_arr, time_arr)
 	print('density x time ({})'
 		  ' linear regression p-value: {}'.format(null, p))
-	line_kws = {'label':"y = {}x + {}, R2 = {}".format(round(slope, 8),
+	line_kws = {'label':"y = {}x + {}, R2 = {}".format(round(slope, 3),
 													   round(intercept, 2),
 												       round(r**2, 2))}
-	sns.regplot(x = density_arr, y = time_arr, 
+	sns.regplot(x = density_arr, y = time_arr,
 			 	ci = 68, seed = 0, color = color,
-				line_kws = line_kws, ax = ax)
-ax.set(xlabel = 'density (%)', ylabel = 'time (s)')
-ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), frameon = False)
-fig.savefig(scaling_abs_path, bbox_inches='tight', dpi = 300)
-plt.close(fig)
+				line_kws = line_kws, ax = ax1)
+
+	slope, intercept, r, p, _ = linregress(density_arr, mse_arr)
+	print('density x mse ({})'
+		  ' linear regression p-value: {}'.format(null, p))
+	line_kws = {'label':"y = {}x + {}, R2 = {}".format(round(slope, 12),
+													   round(intercept, 9),
+												       round(r**2, 8))}
+	sns.regplot(x = density_arr, y = mse_arr,
+			 	ci = 68, seed = 0, color = color,
+				line_kws = line_kws, ax = ax2)
+
+ax1.set(xlabel = 'density (%)', ylabel = 'time (s)')
+ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), frameon = False)
+fig1.savefig(time_scaling_abs_path, bbox_inches='tight', dpi = 300)
+plt.close(fig1)
+
+ax2.set(xlabel = 'density (%)', ylabel = 'MSE')
+ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), frameon = False)
+fig2.savefig(mse_scaling_abs_path, bbox_inches='tight', dpi = 300)
+plt.close(fig2)
+
+time_scaling_path = 'time_size_scaling.svg'
+time_scaling_abs_path = os.path.join(cost_path, time_scaling_path)
+
+mse_scaling_path = 'mse_size_scaling.svg'
+mse_scaling_abs_path = os.path.join(cost_path, mse_scaling_path)
+
+size_map = {'L060': 114, 'L125': 219, 'L250': 448, 'L500': 1000}
+
+fig1, ax1 = plt.subplots()
+fig2, ax2 = plt.subplots()
+for null in ['ms', 'str', 'sa']:
+
+	time_arr = []
+	mse_arr = []
+	size_arr = []
+	for filename in os.listdir('../../data/preprocessed_data/'
+							   'scaling_analysis'):
+		if "L" in filename:
+			size = filename.split('_')[0]
+			conn_dict = pickle_load('../../data/preprocessed_data/'
+						   			'scaling_analysis/{}'
+									'_preprocessed_data_dict'.format(size))
+			time_arr.extend(conn_dict['time'][null])
+			mse_arr.extend(conn_dict['mse'][null])
+			size_arr.extend([size_map[size]]*100)
+
+	color = null_color(null)
+
+	slope, intercept, r, p, _ = linregress(size_arr, time_arr)
+	print('size x time ({})'
+		  ' linear regression p-value: {}'.format(null, p))
+	line_kws = {'label':"y = {}x + {}, R2 = {}".format(round(slope, 5),
+													   round(intercept, 2),
+												       round(r**2, 2))}
+	sns.regplot(x = size_arr, y = time_arr,
+			 	ci = 68, seed = 0, color = color,
+				line_kws = line_kws, ax = ax1)
+
+	slope, intercept, r, p, _ = linregress(size_arr, mse_arr)
+	print('size x mse ({})'
+		  ' linear regression p-value: {}'.format(null, p))
+	line_kws = {'label':"y = {}x + {}, R2 = {}".format(round(slope, 11),
+													   round(intercept, 9),
+												       round(r**2, 8))}
+	sns.regplot(x = size_arr, y = mse_arr,
+			 	ci = 68, seed = 0, color = color,
+				line_kws = line_kws, ax = ax2)
+
+ax1.set(xlabel = 'size', ylabel = 'time (s)')
+ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), frameon = False)
+fig1.savefig(time_scaling_abs_path, bbox_inches='tight', dpi = 300)
+plt.close(fig1)
+
+ax2.set(xlabel = 'size', ylabel = 'MSE')
+ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), frameon = False)
+fig2.savefig(mse_scaling_abs_path, bbox_inches='tight', dpi = 300)
+plt.close(fig2)
 
 #DIRECTED ANIMAL CONNECTOMES
 dir_conn_path = os.path.join(direc, 'dir_conn')
@@ -702,26 +834,34 @@ for animal, SCmat in dir_conns.items():
 plt.rcParams.update({'font.size': 30})
 plt.rcParams['legend.fontsize'] = 20
 
+null = 'sa'
+color = null_color(null)
+og_sa_corrs = {}
 for animal, data in dir_conn_prepro_data.items():
 	SCmat = dir_conns[animal].copy()
 	print(animal)
 
+	og_sa_corrs[animal] = {}
 	for direction in ['in', 'out']:
 
 		if direction == 'in':
 			og_strengths = np.sum(SCmat, axis = 0)
 		else:
 			og_strengths = np.sum(SCmat, axis = 1)
-		
-		rewired_strengths = data['strengths'][direction]
 
-		regplot_path = '{}_{}-strengths_regplot.svg'.format(animal, direction)
+		rewired_strengths = data['strengths'][null][direction]
+
+		regplot_path = '{}_{}_{}-strengths_regplot.svg'.format(animal, null,
+															   direction)
 		regplot_abs_path = os.path.join(dir_conn_path, regplot_path)
 
-		corrs, r, sd = plot_strengths_regplots(og_strengths, rewired_strengths,
-										 	   NNULLS, "#2A7DBC", 
+		corrs, r, sd = plot_strengths_regplots(og_strengths,
+											   rewired_strengths,
+											   NNULLS, color,
 											   regplot_abs_path)
-          
+
+		og_sa_corrs[animal][direction] = np.array(corrs)
+
 		print(direction + '-strengths')
 		print('mean: {}'.format(r))
 		print('sd: {}'.format(sd))
@@ -744,11 +884,11 @@ for conn_key, SCmat in conns.items():
 
 	corrs, r, sd = plot_strengths_regplots(og_strengths, strengths_arr,
 										   100, "#2A7DBC", regplot_abs_path)
-    
+
 	print(conn_key)
 	print('mean: {}'.format(r))
 	print('sd: {}'.format(sd))
-    
+
 	print('compare max error to mse')
 	x = conn_corrs_dict[conn_key]['sa']
 	y = corrs
@@ -757,7 +897,7 @@ for conn_key, SCmat in conns.items():
 log_transform_corrs_dict = {}
 print('log transform statistics')
 for conn_key in ['L125', 'L500']:
-      
+
 	SCmat = conns[conn_key].copy()
 	log_transform_corrs_dict[conn_key] = {}
 
@@ -779,21 +919,21 @@ for conn_key in ['L125', 'L500']:
 		rewired_strengths = []
 		for B_sa in B_sa_list:
 			rewired_strengths.append(np.sum(B_sa, axis = 1))
-		rewired_strengths = [strength for sublist in rewired_strengths 
+		rewired_strengths = [strength for sublist in rewired_strengths
 							 for strength in sublist]
 
-		corrs, r, sd = plot_strengths_regplots(og_strengths, 
+		corrs, r, sd = plot_strengths_regplots(og_strengths,
 											   rewired_strengths,
-											   100, "#2A7DBC", 
+											   100, "#2A7DBC",
 											   regplot_abs_path)
-               
+
 		log_transform_corrs_dict[conn_key][SCmat_type] = corrs
-          
+
 		print(conn_key)
 		print(SCmat_type)
 		print('mean: {}'.format(r))
 		print('sd: {}'.format(sd))
-          
+
 print('log transform statistics')
 
 print('L125')
@@ -818,7 +958,7 @@ for conn_key in conn_keys:
 	data = prepro_data[conn_key]['mse']
 
 	ax = sns.kdeplot(x = np.append(data['ms'], data['str']),
-					 hue = (['Maslov-Sneppen']*NNULLS + 
+					 hue = (['Maslov-Sneppen']*NNULLS +
 							['Rubinov-Sporns']*NNULLS),
 					 palette = ['dimgrey', '#00A1A1'],
 					 fill = True, cut = 0, legend = False)
@@ -838,3 +978,205 @@ for conn_key in conn_keys:
 	x = data['str']
 	y = data['ms']
 	mannwhitneyu_print(x, y, 'str', 'ms')
+
+#DIRECTED ANIMAL CONNECTOMES - benchmarking
+dir_conn_path = os.path.join(direc, 'dir_conn_supp')
+make_dir(dir_conn_path)
+
+plt.rcParams.update({'font.size': 30})
+
+for animal, data in dir_conn_prepro_data.items():
+	SCmat = dir_conns[animal].copy()
+	print(animal)
+	conn_corrs = {}
+	for null in ['ms', 'str', 'in_str_sa']:
+		print(null)
+		color = null_color(null) if null != 'in_str_sa' else null_color('sa')
+
+		null_conn_corrs = {}
+		for direction in ['in', 'out']:
+
+			if direction == 'in':
+				og_strengths = np.sum(SCmat, axis = 0)
+			else:
+				og_strengths = np.sum(SCmat, axis = 1)
+
+			rewired_strengths = data['strengths'][null][direction]
+
+			regplot_path = '{}_{}_{}-strengths_regplot.svg'.format(animal, null,
+																   direction)
+			regplot_abs_path = os.path.join(dir_conn_path, regplot_path)
+
+			corrs, r, sd = plot_strengths_regplots(og_strengths,
+												   rewired_strengths,
+												   NNULLS, color,
+												   regplot_abs_path)
+
+			null_conn_corrs[direction] = np.array(corrs)
+
+			print(direction + '-strengths')
+			print('mean: {}'.format(r))
+			print('sd: {}'.format(sd))
+
+		conn_corrs[null] = null_conn_corrs
+
+	#in
+
+	print('in')
+	x = conn_corrs['in_str_sa']['in']
+	y = conn_corrs['str']['in']
+	mannwhitneyu_print(x, y, 'in_str_sa', 'str')
+	x = og_sa_corrs[animal]['in']
+	mannwhitneyu_print(x, y, 'sa', 'str')
+
+	x = conn_corrs['in_str_sa']['in']
+	y = conn_corrs['ms']['in']
+	mannwhitneyu_print(x, y, 'in_str_sa', 'ms')
+	x = og_sa_corrs[animal]['in']
+	mannwhitneyu_print(x, y, 'sa', 'ms')
+
+	x = conn_corrs['str']['in']
+	y = conn_corrs['ms']['in']
+	mannwhitneyu_print(x, y, 'str', 'ms')
+
+	x = conn_corrs['in_str_sa']['in']
+	y = og_sa_corrs[animal]['in']
+	mannwhitneyu_print(x, y, 'in_str_sa', 'sa')
+
+	#out
+
+	print('out')
+	x = conn_corrs['in_str_sa']['out']
+	y = conn_corrs['str']['out']
+	mannwhitneyu_print(x, y, 'in_str_sa', 'str')
+	x = og_sa_corrs[animal]['out']
+	mannwhitneyu_print(x, y, 'sa', 'str')
+
+	x = conn_corrs['in_str_sa']['out']
+	y = conn_corrs['ms']['out']
+	mannwhitneyu_print(x, y, 'in_str_sa', 'ms')
+	x = og_sa_corrs[animal]['out']
+	mannwhitneyu_print(x, y, 'sa', 'ms')
+
+	x = conn_corrs['str']['out']
+	y = conn_corrs['ms']['out']
+	mannwhitneyu_print(x, y, 'str', 'ms')
+
+	x = conn_corrs['in_str_sa']['out']
+	y = og_sa_corrs[animal]['out']
+	mannwhitneyu_print(x, y, 'in_str_sa', 'sa')
+
+#requires MATLAB and null_model_und_sign.m
+#from BCT (https://sites.google.com/site/bctnet/home?authuser=0)
+#SIGNED ANNOTATION SIMILARITY NETWORKS
+"""
+signed_conn_path = os.path.join(direc, 'signed_conn')
+make_dir(signed_conn_path)
+
+for key, net in signed_conns.items():
+
+	net_path = os.path.join(signed_conn_path, key + '.png')
+
+	vmin = np.percentile(net[net != 0], 2.5)
+	vmax = np.percentile(net[net != 0], 97.5)
+	fig, ax = plt.subplots(figsize = (10, 10))
+	sns.heatmap(net, linewidths = 0.0001, square = True,
+				xticklabels = False, yticklabels = False,
+				cmap = 'RdBu_r', center = 0, cbar_kws = {'shrink': .5},
+				vmin = vmin, vmax = vmax)
+	save_plot(ax, net_path)
+
+for key, data in signed_conn_prepro_data.items():
+	net = signed_conns[key].copy()
+	np.fill_diagonal(net, 0)
+
+	print(key)
+
+	conn_corrs = {}
+	for null in ['ms', 'str', 'sa']:
+		print(null)
+		color = null_color(null)
+
+		if null == 'str':
+			strengths_pos_str_list = []
+			strengths_neg_str_list = []
+			for i in range(100):
+				#requires null_model_und_sign.m
+				B_str = eng.null_model_und_sign(matlab.double(net.tolist()),
+												matlab.double([10]),
+												matlab.double([1]))
+				B_str = np.array(B_str)
+
+				pos_B_str = B_str.copy()
+				pos_B_str[pos_B_str < 0] = 0
+				neg_B_str = B_str.copy()
+				neg_B_str[neg_B_str > 0] = 0
+				strengths_pos_str_list.append(np.sum(pos_B_str, axis = 1))
+				strengths_neg_str_list.append(np.sum(neg_B_str, axis = 1))
+
+			strengths_pos_str_list = np.array(strengths_pos_str_list)
+			strengths_pos_str_list = strengths_pos_str_list.flatten()
+			strengths_neg_str_list = np.array(strengths_neg_str_list)
+			strengths_neg_str_list = strengths_neg_str_list.flatten()
+
+			data['strengths'][null] = {'pos': strengths_pos_str_list,
+									   'neg': strengths_neg_str_list}
+
+		null_conn_corrs = {}
+		for sign in ['pos', 'neg']:
+
+			if sign == 'pos':
+				signed_net = net.copy()
+				signed_net[signed_net < 0] = 0
+			else:
+				signed_net = net.copy()
+				signed_net[signed_net > 0] = 0
+
+			og_strengths = np.sum(signed_net, axis = 1)
+			rewired_strengths = data['strengths'][null][sign]
+
+			regplot_path = '{}_{}_{}-strengths_regplot.svg'.format(key, null,
+																   sign)
+			regplot_abs_path = os.path.join(signed_conn_path, regplot_path)
+
+			corrs, r, sd = plot_strengths_regplots(og_strengths,
+												   rewired_strengths,
+												   100, color,
+												   regplot_abs_path)
+
+			null_conn_corrs[sign] = np.array(corrs)
+
+			print(sign + '-strengths')
+			print('mean: {}'.format(r))
+			print('sd: {}'.format(sd))
+
+		conn_corrs[null] = null_conn_corrs
+
+	#pos
+	print('pos')
+	x = conn_corrs['sa']['pos']
+	y = conn_corrs['str']['pos']
+	mannwhitneyu_print(x, y, 'sa', 'str')
+
+	x = conn_corrs['sa']['pos']
+	y = conn_corrs['ms']['pos']
+	mannwhitneyu_print(x, y, 'sa', 'ms')
+
+	x = conn_corrs['str']['pos']
+	y = conn_corrs['ms']['pos']
+	mannwhitneyu_print(x, y, 'str', 'ms')
+
+	#neg
+	print('neg')
+	x = conn_corrs['sa']['neg']
+	y = conn_corrs['str']['neg']
+	mannwhitneyu_print(x, y, 'sa', 'str')
+
+	x = conn_corrs['sa']['neg']
+	y = conn_corrs['ms']['neg']
+	mannwhitneyu_print(x, y, 'sa', 'ms')
+
+	x = conn_corrs['str']['neg']
+	y = conn_corrs['ms']['neg']
+	mannwhitneyu_print(x, y, 'str', 'ms')
+"""

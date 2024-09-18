@@ -7,14 +7,14 @@ from utils import cpl_func
 def strength_preserving_rand_sa_trajectory(A, rewiring_iter = 10,
                                            nstage = 100, niter = 10000,
                                            temp = 1000, frac = 0.5,
-                                           connected = None, verbose = False, 
+                                           connected = None, verbose = False,
                                            seed = None):
 
     """
     Degree- and strength-preserving randomization of
     undirected, weighted adjacency matrix A
     while tracking energy, and global network features
-    
+
     Parameters
     ----------
     A : (N, N) array-like
@@ -34,28 +34,32 @@ def strength_preserving_rand_sa_trajectory(A, rewiring_iter = 10,
         Whether to ensure connectedness of the randomized network.
         By default, this is inferred from data.
     verbose: bool, optional
-        Whether to print status to screen at the end of every stage. 
+        Whether to print status to screen at the end of every stage.
         Default = False.
     seed: float, optional
         Random seed. Default = None.
 
     Returns
     -------
-    B : (N, N) array-like
-        Randomized adjacency matrix
-    min_energy : float
-        Minimum energy obtained by annealing
+    strength_trajectory : list
+        Strength sequence at the end of each stage
+    energy_trajectory : list
+        Energy at the end of each stage
+    cpl_trajectory : list
+        Characteristic path length at the end of each stage
+    clustering_trajectory : list
+        Clustering coefficient at the end of each stage
 
     Notes
     -------
     Uses Maslov & Sneppen rewiring model to produce a
-    surrogate adjacency matrix, B, with the same 
-    size, density, and degree sequence as A. 
+    surrogate adjacency matrix, B, with the same
+    size, density, and degree sequence as A.
     The weights are then permuted to optimize the
-    match between the strength sequences of A and B 
+    match between the strength sequences of A and B
     using simulated annealing.
-    
-    This function is adapted from a function written in MATLAB 
+
+    This function is adapted from a function written in MATLAB
     by Richard Betzel.
 
     References
@@ -69,7 +73,7 @@ def strength_preserving_rand_sa_trajectory(A, rewiring_iter = 10,
     except TypeError as err:
         msg = ('A must be array_like. Received: {}.'.format(type(A)))
         raise TypeError(msg) from err
-    
+
     if frac > 1 or frac <= 0:
         msg = ('frac must be between 0 and 1. '
                'Received: {}.'.format(frac))
@@ -148,7 +152,7 @@ def strength_preserving_rand_sa_trajectory(A, rewiring_iter = 10,
                   'frac of accepted moves {:.3f}'.format(istage, temp,
                                                          energymin,
                                                          naccept/niter))
-        
+
         curr_B = np.zeros((n, n))
         curr_B[(u, v)] = wtsmin
         curr_B = curr_B + curr_B.T
@@ -163,5 +167,5 @@ def strength_preserving_rand_sa_trajectory(A, rewiring_iter = 10,
         cpl_trajectory.append(cpl)
         clustering_trajectory.append(mean_clustering)
 
-    return [strengths_trajectory, energy_trajectory, 
+    return [strengths_trajectory, energy_trajectory,
             cpl_trajectory, clustering_trajectory]

@@ -8,6 +8,7 @@ from scipy.stats import spearmanr, mannwhitneyu, iqr
 
 import seaborn as sns
 import matplotlib.pyplot as plt
+import colorsys
 
 from strength_preserving_rand_sa import strength_preserving_rand_sa
 
@@ -24,6 +25,13 @@ def make_dir(path):
 
 
 #plotting functions
+
+#https://stackoverflow.com/a/60562502
+def scale_lightness(rgb, scale_l):
+    # convert rgb to hls
+    h, l, s = colorsys.rgb_to_hls(*rgb)
+    # manipulate h, l, s values and return as rgb
+    return colorsys.hls_to_rgb(h, min(1, l * scale_l), s = s)
 
 #plotting parameters
 marginal_kws = {'element': 'step', 'alpha': 0.7}
@@ -44,19 +52,19 @@ def null_color(null):
 def plot_morphospace(x, y, hue, palette, morpho_path, linewidth = None,
                      plot_legend = False, legend_title = None):
 
-    ax = sns.jointplot(x = x, y = y, hue = hue, palette = palette, 
+    ax = sns.jointplot(x = x, y = y, hue = hue, palette = palette,
                        rasterized = True, linewidth = linewidth)
-    ax.ax_joint.set(xlabel = 'Characteristic path length', 
+    ax.ax_joint.set(xlabel = 'Characteristic path length',
                     ylabel = 'Clustering')
     if plot_legend:
-        ax.ax_joint.legend(title = legend_title, loc='center left', 
+        ax.ax_joint.legend(title = legend_title, loc='center left',
                            bbox_to_anchor=(1.15, 0.5), frameon = False)
     else:
         ax.ax_joint.legend().remove()
     ax.savefig(morpho_path, dpi = 300)
     plt.close(ax.fig)
 
-def plot_strengths_regplots(og_strengths, rewired_strengths, 
+def plot_strengths_regplots(og_strengths, rewired_strengths,
 							nnulls, color, regplot_abs_path):
 
 	x = np.tile(og_strengths, nnulls)
@@ -80,7 +88,7 @@ def plot_strengths_regplots(og_strengths, rewired_strengths,
 					  height = 10, ratio = 7, marginal_kws = marginal_kws,
 					  scatter_kws = scatter_kws, line_kws = line_kws,
 					  seed = 0)
-	g.ax_joint.set(xlabel = 'strengths in empirical', 
+	g.ax_joint.set(xlabel = 'strengths in empirical',
 				   ylabel = 'strengths in randomized')
 	g.ax_joint.legend()
 	g.ax_joint.legend(frameon = False)
@@ -175,7 +183,7 @@ def mannwhitneyu_print(x, y, xlabel, ylabel):
 	u, p_val = mannwhitneyu(x, y)
 	print('{} median={}, IQR={}'.format(xlabel, np.median(x), iqr(x)))
 	print('{} median={}, IQR={}'.format(ylabel, np.median(y), iqr(y)))
-	print('Mann-Whitney U rank test {}: u={}, p={}'.format(xlabel + '-' + 
+	print('Mann-Whitney U rank test {}: u={}, p={}'.format(xlabel + '-' +
                                                            ylabel, u, p_val))
 	print('cles = {}'.format(pg.compute_effsize(x, y, eftype = 'CLES')))
 
@@ -191,7 +199,7 @@ def niter_null_strengths(SCmat, seed):
 
     return strengths_sa_1000_iter, strengths_sa_100000_iter
 
-#function to calculate mean null rich-club coefficients and 
+#function to calculate mean null rich-club coefficients and
 #identify significant threshold degree values
 def phi_stats(og_phi, null_phi):
 
@@ -201,12 +209,10 @@ def phi_stats(og_phi, null_phi):
         null_distrib = null_phi[:, i]
         null_distrib_mean = np.mean(null_distrib)
         mean_null_phi.append(null_distrib_mean)
-        demeaned_null_distrib = null_distrib - null_distrib_mean
-        demeaned_phi = og_phi[:, i] - null_distrib_mean
         #p-value derived as the proportion of the null distribution
         #that is more extreme than the empirical value
-        p_sum = (np.abs(demeaned_null_distrib) >= np.abs(demeaned_phi)).sum()
-        p = p_sum/len(demeaned_null_distrib)
+        p_sum = (null_distrib >= og_phi[:, i]).sum()
+        p = p_sum/len(null_distrib)
         #Bonferroni correction
         if p < 0.05/og_phi.shape[1]:
             k_sig.append(1)
@@ -269,7 +275,7 @@ def build_morpho_dict(path, net_list):
         net_len = len(data['colours'])
         for feature in features:
             features_dict[feature].extend(data[feature])
-            
+
         features_dict['net'].extend([net]*net_len)
     features_dict['net'] = np.array(features_dict['net'])
     for feature in features:

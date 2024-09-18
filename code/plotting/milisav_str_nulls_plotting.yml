@@ -248,6 +248,7 @@ dependencies:
   - pip:
     - bctpy==0.5.2
     - littleutils==0.2.2
+    - matlabengine==24.1.2
     - netneurotools==0.2.3
     - networkx==3.2.1
     - nibabel==5.1.0
