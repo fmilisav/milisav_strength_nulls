@@ -1,5 +1,7 @@
 import os
 
+import pandas as pd
+
 import numpy as np
 from pingouin import compute_effsize
 from scipy.stats import goodness_of_fit, shapiro, skew, \
@@ -33,9 +35,6 @@ net_list = list(range(38))
 net_list.remove(11)
 net_list = np.array(net_list) + 1
 
-features = ['cpl', 'mean_clustering', 'colours']
-nulls = ['original', 'ms', 'str', 'sa']
-
 net_data_path = '../../data/preprocessed_data/weightedNets/net'
 print('NETWORKS' + '\n--------')
 
@@ -50,6 +49,13 @@ y = net_morphospace['mean_clustering'][og_idx]
 hue = net_morphospace['net'][og_idx]
 palette = cm.get_cmap('jet', len(net_list))
 plot_morphospace(x, y, hue, palette, net_morpho_path)
+
+#create morphospace source data csv
+morphospace_df = pd.DataFrame({'CPL': x,
+							   'clustering': y,
+							   'null': hue})
+morphospace_df.to_csv(os.path.join(net_path,
+								   'Fig6a_source_data.csv'))
 
 #strength sequence preservation
 
@@ -105,14 +111,18 @@ plt.rcParams['legend.fontsize'] = 20
 corr_path = os.path.join(net_path, 'net_strength_corr_cumul_distribs.svg')
 
 cumul_distrib_len = NNULLS*len(net_list)
-ax = sns.kdeplot(x = np.append(cumul_corrs['ms'],
-                               [cumul_corrs['str'],
-                                cumul_corrs['sa']]),
-                    hue = (['ms']*cumul_distrib_len +
-                           ['str']*cumul_distrib_len +
-                           ['sa']*cumul_distrib_len),
-                    palette = ['dimgrey', '#00A1A1', '#2A7DBC'],
-                    fill = True, cut = 0)
+x = np.append(cumul_corrs['ms'],
+              [cumul_corrs['str'],
+               cumul_corrs['sa']]),
+hue = ['Maslov-Sneppen']*cumul_distrib_len + \
+      ['Rubinov-Sporns']*cumul_distrib_len + \
+      ['simulated annealing']*cumul_distrib_len
+corr_df = pd.DataFrame({'rho': x, 'null': hue})
+corr_df.to_csv(os.path.join(net_path, 'Fig6b_source_data.csv'))
+
+ax = sns.kdeplot(x = x, hue = hue,
+                 palette = ['dimgrey', '#00A1A1', '#2A7DBC'],
+                 fill = True, cut = 0)
 ax.set_xlabel("Spearman's rho")
 ax.set_box_aspect(1)
 save_plot(ax, corr_path)

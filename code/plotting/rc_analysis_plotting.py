@@ -3,6 +3,8 @@ import os
 import numpy as np
 from scipy.stats import spearmanr
 
+import pandas as pd
+
 from utils import pickle_load, make_dir, phi_stats, \
                   med_avg_weight, med_euc_dist, \
                   mannwhitneyu_print, save_plot
@@ -135,6 +137,11 @@ for conn_key, SCmat in conns.items():
         rich_conn = SCmat.copy()
         rich_conn[rich_mask == 0] = 0
 
+        #save rich-club source data csv
+        rc_conn_csv_path = 'Fig4b_source_data.csv'
+        rc_conn_csv_abs_path = os.path.join(rc_path, rc_conn_csv_path)
+        np.savetxt(rc_conn_csv_abs_path, rich_conn, delimiter = ',')
+
         node_size = 0.05*strength
         node_color = ['#2A7DBC']*len(degree)
         node_color = np.array(node_color)
@@ -183,6 +190,21 @@ for conn_key, SCmat in conns.items():
     hue = ['Maslov-Sneppen']*og_phi.shape[1] + \
           ['Rubinov-Sporns']*og_phi.shape[1] + \
           ['simulated annealing']*og_phi.shape[1]
+
+    if conn_key == 'HCP800':
+        #create detection boolean from significant indices
+        detection = []
+        for sign_idx in [k_sig_ms_idx, k_sig_str_idx, k_sig_sa_idx]:
+            curr_detection = np.zeros(og_phi.shape[1])
+            curr_detection[sign_idx] = 1
+            detection += list(curr_detection)
+        #save normalized rich-club ratio source data csv
+        norm_rc_df = pd.DataFrame({'degree': x,
+                                   'normalized rich-club ratio': y,
+                                   'null': hue,
+                                   'detection': detection})
+        norm_rc_df.to_csv(os.path.join(rc_path, 'Fig4a_source_data.csv'))
+
     fig, ax = plt.subplots(figsize = (9, 6))
     sns.lineplot(x = x, y = y, hue = hue,
                  palette = ['dimgrey', '#00A1A1', '#2A7DBC'], ax = ax)

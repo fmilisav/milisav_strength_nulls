@@ -140,6 +140,20 @@ direc = os.path.abspath('../../figures')
 regplots_path = os.path.join(direc, 'str_seq')
 make_dir(regplots_path)
 
+#create strength source data csv for HCP800
+strengths_column = list(og_strengths_dict['HCP800']) + \
+				   list(strengths['HCP800']['ms']) + \
+				   list(strengths['HCP800']['str']) + \
+				   list(strengths['HCP800']['sa'])
+null_data_len = NNULLS*len(og_strengths_dict['HCP800'])
+null_column = ['empirical']*len(og_strengths_dict['HCP800']) + \
+			  ['Maslov-Sneppen']*null_data_len + \
+			  ['Rubinov-Sporns']*null_data_len + \
+			  ['simulated annealing']*null_data_len
+strengths_df = pd.DataFrame({'strengths': strengths_column,
+							 'null': null_column})
+strengths_df.to_csv(os.path.join(regplots_path, 'Fig2a_source_data.csv'))
+
 conn_corrs_dict = {}
 print('sequence statistics')
 for conn_key, SCmat in conns.items():
@@ -156,8 +170,11 @@ for conn_key, SCmat in conns.items():
 		og_strengths = og_strengths_dict[conn_key]
 		rewired_strengths = strengths[conn_key][null]
 
-		corrs, _, _ = plot_strengths_regplots(og_strengths, rewired_strengths,
+		corrs, r, sd = plot_strengths_regplots(og_strengths, rewired_strengths,
 											  NNULLS, color, regplot_abs_path)
+
+		print('mean: {}'.format(r))
+		print('sd: {}'.format(sd))
 
 		conn_corrs[null] = np.array(corrs)
 
@@ -211,7 +228,8 @@ for conn_key, SCmat in conns.items():
 		p_arr = []
 		for i in range(NNULLS):
 			x = rewired_strengths[i*SCmat_n:(i + 1)*SCmat_n]
-			sns.ecdfplot(x = x, color = color, legend = False, ax = ax2)
+			sns.ecdfplot(x = x, color = color, legend = False, ax = ax2,
+						 rasterized = True)
 			ks, p = kstest(x, og_strengths)
 			KS_arr.append(ks)
 			p_arr.append(p)
@@ -231,7 +249,8 @@ for conn_key, SCmat in conns.items():
 	ax.set_box_aspect(1)
 	save_plot(ax, ksplot_abs_path)
 
-	sns.ecdfplot(x = og_strengths, color = "#6725A1", legend = False, ax = ax2)
+	sns.ecdfplot(x = og_strengths, color = "#6725A1", legend = False, ax = ax2,
+			  	 rasterized = True)
 
 	ax2.set_xlabel('strengths')
 	ax2.set_box_aspect(1)
@@ -258,6 +277,18 @@ for conn_key, SCmat in conns.items():
 	x = KS_dict['str']
 	y = KS_dict['ms']
 	mannwhitneyu_print(x, y, 'str', 'ms')
+
+	if conn_key == 'HCP800':
+		#create KS source data csv
+		KS_column = list(KS_dict['ms']) + \
+				    list(KS_dict['str']) + \
+				    list(KS_dict['sa'])
+		null_column = ['Maslov-Sneppen']*NNULLS + \
+					  ['Rubinov-Sporns']*NNULLS + \
+					  ['simulated annealing']*NNULLS
+		KS_df = pd.DataFrame({'KS_stat': KS_column,
+							  'null': null_column})
+		KS_df.to_csv(os.path.join(distrib_path, 'Fig2b_source_data.csv'))
 
 #hubs
 print('hubs statistics')
@@ -579,6 +610,14 @@ for conn_key, SCmat in conns.items():
 					subsampling_df['var_diff'].append(norm_var_diff)
 
 	subsampling_df = pd.DataFrame(subsampling_df)
+	if conn_key == 'HCP800':
+		#create subsampling source data csv
+		subsampling_df['null'] = subsampling_df['null'].replace({'ms': 'Maslov-Sneppen',
+																 'str': 'Rubinov-Sporns',
+																 'sa': 'simulated annealing'})
+		subsampling_df.to_csv(os.path.join(morphospaces_path,
+										   'Fig3b_source_data.csv'))
+
 	for feature in ['cpl', 'clustering']:
 		for stat in ['mean_diff', 'var_diff']:
 
@@ -632,6 +671,14 @@ for conn_key, SCmat in conns.items():
 	x = mean_clustering[str_idx]
 	y = mean_clustering[ms_idx]
 	mannwhitneyu_print(x, y, 'str', 'ms')
+
+	if conn_key == 'HCP800':
+		#create morphospace source data csv
+		morphospace_df = pd.DataFrame({'CPL': cpl,
+									   'clustering': mean_clustering,
+									   'null': colours})
+		morphospace_df.to_csv(os.path.join(morphospaces_path,
+										   'Fig3a_source_data.csv'))
 
 #COST-PERFORMANCE TRADEOFF
 cost_path = os.path.join(direc, 'cost_perform')
@@ -823,13 +870,18 @@ make_dir(dir_conn_path)
 
 for animal, SCmat in dir_conns.items():
 
-	animal_path = os.path.join(dir_conn_path, animal + '.png')
+	animal_path = os.path.join(dir_conn_path, animal + '.svg')
 
 	fig, ax = plt.subplots(figsize = (10, 10))
 	sns.heatmap(SCmat, linewidths = 0.01, square = True,
 				xticklabels = False, yticklabels = False,
-				cmap = 'OrRd', cbar_kws = {'shrink': .5})
+				cmap = 'OrRd', cbar_kws = {'shrink': .5},
+				rasterized = True)
 	save_plot(ax, animal_path)
+
+	#save SCmat as csv
+	SCmat_csv_path = os.path.join(dir_conn_path, animal + '.csv')
+	np.savetxt(SCmat_csv_path, SCmat, delimiter = ',')
 
 plt.rcParams.update({'font.size': 30})
 plt.rcParams['legend.fontsize'] = 20
@@ -837,6 +889,10 @@ plt.rcParams['legend.fontsize'] = 20
 null = 'sa'
 color = null_color(null)
 og_sa_corrs = {}
+strengths_column = []
+null_column = []
+animal_column = []
+direction_column = []
 for animal, data in dir_conn_prepro_data.items():
 	SCmat = dir_conns[animal].copy()
 	print(animal)
@@ -865,6 +921,23 @@ for animal, data in dir_conn_prepro_data.items():
 		print(direction + '-strengths')
 		print('mean: {}'.format(r))
 		print('sd: {}'.format(sd))
+
+		strengths_column.extend(og_strengths)
+		null_column.extend(['empirical']*len(og_strengths))
+		animal_column.extend([animal]*len(og_strengths))
+		direction_column.extend([direction]*len(og_strengths))
+		null_data_len = NNULLS*len(og_strengths)
+		strengths_column.extend(rewired_strengths)
+		null_column.extend([null]*null_data_len)
+		animal_column.extend([animal]*null_data_len)
+		direction_column.extend([direction]*null_data_len)
+
+#create strength source data csv for animal connectomes
+strengths_df = pd.DataFrame({'strengths': strengths_column,
+							 'null': null_column,
+							 'animal': animal_column,
+							 'direction': direction_column})
+strengths_df.to_csv(os.path.join(dir_conn_path, 'Fig5_source_data.csv'))
 
 #SUPPLEMENTARY
 supp_path = os.path.join(direc, 'supplementary')

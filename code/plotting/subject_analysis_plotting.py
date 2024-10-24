@@ -49,7 +49,6 @@ plot_morphospace(x, y, hue, palette, subj_morpho_path, linewidth = 0.5,
 
 #all nulls
 
-plt.rcParams.update({'font.size': 20})
 subj_morpho_path = os.path.join(subj_path, 'subj_morphospace_nulls.svg')
 
 null_idx = np.where(subj_morphospace['colours'] != 'original')[0]
@@ -108,7 +107,7 @@ og_subj_dist = squareform(pdist(X))
 subj_dist_triu_idx = np.triu_indices(og_subj_dist.shape[0], k = 1)
 og_subj_dist_triu = og_subj_dist[subj_dist_triu_idx]
 
-#for each seed and null model, 
+#for each seed and null model,
 #calculating null Euclidean distance matrix between subjects
 corr_dict = {'ms': [], 'str': [], 'sa': []}
 for i in range(NNULLS):
@@ -119,7 +118,7 @@ for i in range(NNULLS):
             colour = 'Rubinov-Sporns'
         else: colour = 'simulated annealing'
         null_idx = subj_morphospace['colours'] == colour
-        
+
         #coordinates of null networks in morphospace
         cpl = []
         mean_clustering = []
@@ -128,14 +127,14 @@ for i in range(NNULLS):
             idx = null_idx & subj_idx
             cpl.append(subj_morphospace['cpl'][idx][i])
             mean_clustering.append(subj_morphospace['mean_clustering'][idx][i])
-        
+
         X = list(zip(cpl, mean_clustering))
         #Euclidean distance between null networks
         null_subj_dist = squareform(pdist(X))
         #upper triangle
         null_subj_dist_triu = null_subj_dist[subj_dist_triu_idx]
-        
-        corr_dict[null].append(spearmanr(og_subj_dist_triu, 
+
+        corr_dict[null].append(spearmanr(og_subj_dist_triu,
                                          null_subj_dist_triu)[0])
 
 print('subject relationships preservation statistics')
@@ -143,10 +142,10 @@ plt.rcParams.update({'font.size': 15})
 plt.rcParams['legend.fontsize'] = 20
 corr_path = os.path.join(subj_path, 'subj_corr_distribs.svg')
 
-ax = sns.kdeplot(x = np.append(corr_dict['ms'], 
+ax = sns.kdeplot(x = np.append(corr_dict['ms'],
                                [corr_dict['str'], corr_dict['sa']]),
-                    hue = (['Maslov-Sneppen']*NNULLS + 
-                           ['Rubinov-Sporns']*NNULLS + 
+                    hue = (['Maslov-Sneppen']*NNULLS +
+                           ['Rubinov-Sporns']*NNULLS +
                            ['simulated annealing']*NNULLS),
                     palette = ['dimgrey', '#00A1A1', '#2A7DBC'],
                     fill = True, cut = 0)
@@ -187,14 +186,14 @@ for subj in subj_list:
         regplot_abs_path = os.path.join(regplots_path, regplot_path)
 
         color = null_color(null)
-        
+
         og_strengths = data['strengths']['original']
         rewired_strengths = data['strengths'][null]
 
         corrs, r, sd = plot_strengths_regplots(og_strengths, rewired_strengths,
                                                NNULLS, color, regplot_abs_path)
 
-        
+
         cumul_corrs[null].extend(corrs)
         subj_corrs[null] = np.array(corrs)
 
@@ -216,11 +215,11 @@ plt.rcParams['legend.fontsize'] = 20
 corr_path = os.path.join(subj_path, 'subj_strength_corr_cumul_distribs.svg')
 
 cumul_distrib_len = NNULLS*len(subj_list)
-ax = sns.kdeplot(x = np.append(cumul_corrs['ms'], 
-                               [cumul_corrs['str'], 
+ax = sns.kdeplot(x = np.append(cumul_corrs['ms'],
+                               [cumul_corrs['str'],
                                 cumul_corrs['sa']]),
-                    hue = (['ms']*cumul_distrib_len + 
-                           ['str']*cumul_distrib_len + 
+                    hue = (['ms']*cumul_distrib_len +
+                           ['str']*cumul_distrib_len +
                            ['sa']*cumul_distrib_len),
                     palette = ['dimgrey', '#00A1A1', '#2A7DBC'],
                     fill = True, cut = 0)
