@@ -43,7 +43,7 @@ conda env create -f code/plotting/milisav_str_nulls_plotting.yml
 conda activate milisav_str_nulls_plotting
 ```
 
-or replacing `code/plotting/milisav_str_nulls_plotting.yml` by `code/analysis/milisav_str_nulls_analysis.yml` and `milisav_str_nulls_plotting` by `milisav_str_nulls_analysis` as appropriate. This should take a couple minutes. Note that some packages are Linux-specific. To simply use the simulated annealing functions, a minimal installation consists of the following packages: 
+or replacing `code/plotting/milisav_str_nulls_plotting.yml` by `code/analysis/milisav_str_nulls_analysis.yml` and `milisav_str_nulls_plotting` by `milisav_str_nulls_analysis` as appropriate. This should take a couple minutes. Note that some packages are Linux-specific. Analyses were performed on a machine running Ubuntu 20.04.6 LTS. To simply use the simulated annealing functions, a minimal installation consists of the following packages: 
 
 - bct>=0.6.1
 
