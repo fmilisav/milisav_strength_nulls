@@ -45,13 +45,13 @@ conda activate milisav_str_nulls_plotting
 
 or replacing `code/plotting/milisav_str_nulls_plotting.yml` by `code/analysis/milisav_str_nulls_analysis.yml` and `milisav_str_nulls_plotting` by `milisav_str_nulls_analysis` as appropriate. This should take a couple minutes. Note that some packages are Linux-specific. Analyses were performed on a machine running Ubuntu 20.04.6 LTS. To simply use the simulated annealing functions, a minimal installation consists of the following packages: 
 
-- bct>=0.6.1
+- bctpy>=0.5.2
 
-- numpy>=1.25
+- numpy>=1.24.4
 
-- tqdm>=4.65
+- tqdm>=4.64.0
 
-- scikit-learn>=1.3.0
+- scikit-learn>=1.1.2
 
 4. To reproduce the manuscript figures, simply type:
 
