@@ -1,7 +1,7 @@
 ## A simulated annealing algorithm for randomizing weighted networks
 
 This repository contains code written in support of the work presented in 
-[A simulated annealing algorithm for randomizing weighted networks](https://www.biorxiv.org/content/10.1101/2024.02.23.581792v1), 
+[A simulated annealing algorithm for randomizing weighted networks](https://www.nature.com/articles/s43588-024-00735-z), 
 as well as data necessary to reproduce the results.
 
 We propose a simulated annealing procedure for generating strength sequence-preserving randomized networks and benchmark it against other rewiring algorithms commonly used in network neuroscience.
